@@ -4,6 +4,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <Ticker.h>
+void tickUp();
 #define MOVEMENT_PIN D4
 #define TIMOUT 60
 
@@ -13,30 +14,17 @@ char pw[] = WIFIKEY;
 MLEDScroll matrix;
 WiFiClient espClient;
 PubSubClient client(espClient);
-Ticker sekuntiTikuttaja;
+Ticker sekuntiTikuttaja(tickUp, 1000, 0, MILLIS);
 
 int secudejaJaSusia = 0;
+int lastValue=3;
 
 
-
-void letterBlink(String _letter, uint8_t _pause) {
-  matrix.setIntensity(0);
-  matrix.character(_letter);
-  for(uint8_t i=0;i<=8;i++) {
-    matrix.setIntensity(i);
-    delay(_pause);  
-  }
-  delay(_pause*10);
-  for(uint8_t i=8;i<=0;i--) {
-    matrix.setIntensity(i);
-    delay(_pause);  
-  }   
-}
 
 void tickUp(){
   secudejaJaSusia++;
   if(secudejaJaSusia>TIMOUT){
-    letterBlink("R",50);
+    matrix.character("R");
     ESP.reset();
   }
 }
@@ -60,9 +48,8 @@ void setupWifi(){
 void setup() {
    matrix.begin();
    matrix.flip=true;
-   letterBlink("S",50);
+   matrix.character("S");
    Serial.begin(115200);
-   sekuntiTikuttaja.attach(1,tickUp);
    setupWifi();
    pinMode(MOVEMENT_PIN,INPUT);
 }
@@ -98,12 +85,17 @@ void loop() {
     reconnect();
   }
   client.loop();
-  if(digitalRead(MOVEMENT_PIN)){
+  int read = digitalRead(MOVEMENT_PIN);
+  if(read!=lastValue){
    matrix.clear();
-   client.publish(TOPIC,"1");
-  }else {
-    client.publish(TOPIC,"0");
-    matrix.clear();
+   if(read==0){
+      client.publish(TOPIC,"0");
+      matrix.character("O");
+   } else {
+      client.publish(TOPIC,"1");
+      matrix.character("M");
+   }
+   lastValue=read;
   }
   delay(300);
   client.loop();
